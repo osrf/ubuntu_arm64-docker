@@ -4,23 +4,26 @@
 set -e
 
 ### settings
-arch=aarch64
-suite=trusty
-suite_number=14.04
-chroot_dir="/var/chroot/ubuntu_aarch64_$suite"
-docker_image="osrf/ubuntu_arm64:$suite"
+arch=arm64
+qemuversion=aarch64
+suite=xenial
+suite_number=16.04
+chroot_dir="/var/chroot/ubuntu_$arch_$suite"
+docker_image="osrf/ubuntu_$arch:$suite"
 
 ### make sure that the required tools are installed
 #apt-get install -y docker.io qemu-arm-static
 
 # fetch and unpack base image
-ARCHIVE_NAME=ubuntu-core-$suite_number-core-arm64.tar
-BASE_IMAGE_URL=http://cdimage.ubuntu.com/ubuntu-core/releases/$suite/release/$ARCHIVE_NAME.gz
+
+ARCHIVE_NAME=ubuntu-$suite-core-cloudimg-$arch-root.tar.gz
+# BASE_IMAGE_URL=http://cdimage.ubuntu.com/ubuntu-core/releases/$suite/release/$ARCHIVE_NAME.gz
+BASE_IMAGE_URL=https://partner-images.canonical.com/core/$suite/current/$ARCHIVE_NAME
 mkdir -p $chroot_dir
-if [ ! -e /tmp/$ARCHIVE_NAME.gz ]; then
-  curl $BASE_IMAGE_URL -o /tmp/$ARCHIVE_NAME.gz
+if [ ! -e /tmp/$ARCHIVE_NAME ]; then
+  curl $BASE_IMAGE_URL -o /tmp/$ARCHIVE_NAME
 fi
-tar -xf /tmp/$ARCHIVE_NAME.gz -C $chroot_dir
+tar -xf /tmp/$ARCHIVE_NAME -C $chroot_dir
 
 # a few minor docker-specific tweaks
 # see https://github.com/docker/docker/blob/master/contrib/mkimage/debootstrap
@@ -45,13 +48,13 @@ echo 'Acquire::Languages "none";' > $chroot_dir/etc/apt/apt.conf.d/docker-no-lan
 echo 'Acquire::GzipIndexes "true"; Acquire::CompressionTypes::Order:: "gz";' > $chroot_dir/etc/apt/apt.conf.d/docker-gzip-indexes
 
 # add qemu to base image
-cp /usr/bin/qemu-aarch64-static $chroot_dir/usr/bin/
+cp /usr/bin/qemu-$qemuversion-static $chroot_dir/usr/bin/
 
 ### create a tar archive from the chroot directory
-tar cfz ubuntu_aarch64_$suite.tgz -C $chroot_dir .
+tar cfz ubuntu_$arch_$suite.tgz -C $chroot_dir .
 
 ### import this tar archive into a docker image:
-cat ubuntu_aarch64_$suite.tgz | docker import - $docker_image
+cat ubuntu_$arch_$suite.tgz | docker import - $docker_image
 
 # Update packages
 # FIXME Replace udev hold as soon as it does correctly upgrade on qemu
@@ -66,7 +69,7 @@ sudo docker commit $CID $docker_image
 sudo docker rm $CID
 
 # ### cleanup
-rm ubuntu_aarch64_$suite.tgz
+rm ubuntu_$arch_$suite.tgz
 rm -rf $chroot_dir
 
 ### push image to Docker Hub
